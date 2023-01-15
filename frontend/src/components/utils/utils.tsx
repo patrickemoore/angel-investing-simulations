@@ -27,7 +27,72 @@ export function generateTimeAndReturn(die): TimeAndReturn {
   let t: number = 12 * Math.max(0.5, mu + sigma * clamp(-2, Math.log(r2/(1-r2)) * 1.35, 2));
 
   return {
-    time: t,
-    return: x
+    timeToMaturity: t,
+    returnMultiplier: x
   };
+}
+
+function generateOutcome(simulationParams: SimulationParameters): Outcome {
+  const { moneyParams, timeParams, decisionParams, distributionParams } = simulationParams;
+
+  const outcome: Outcome = [];
+  let balance: number = moneyParams.portfolioValue;
+
+  const investmentOpportunities: InvestmentOpportunity[] = []
+  const activeInvestments: Set<Investment> = new Set();
+
+  const investmentCount: number = decisionParams.reinvestEarning ? decisionParams.lastInvestmentTime as number * timeParams.investmentsPerYear : moneyParams.portfolioValue / moneyParams.investmentValue;
+
+  for (let investmentNo = 0; investmentNo < investmentCount; investmentNo++) {
+    const nextInvestment: InvestmentOpportunity = {
+      investmentAmount: moneyParams.investmentValue,
+      startTime: investmentNo / timeParams.investmentsPerYear * 12
+    };
+    investmentOpportunities.push(nextInvestment);
+  }
+
+  for (let month = 0; activeInvestments.size || investmentOpportunities.length; month++) {
+
+    // Add the current balance to the outcome
+    outcome.push(balance);
+
+    // Receive all matured investments
+    for (const investment of activeInvestments) {
+      if (investment.maturationTime <= month) {
+        balance += investment.returnAmount;
+        activeInvestments.delete(investment);
+      }
+    }
+
+    // Take all investment opportunities possible up to the current time
+    while (investmentOpportunities.length && investmentOpportunities[0].startTime <= month) {
+      if (investmentOpportunities[0].investmentAmount <= balance) {
+        balance -= investmentOpportunities[0].investmentAmount;
+        const generatedTimeAndReturn: TimeAndReturn = generateTimeAndReturn(distributionParams.die);
+        activeInvestments.add({
+          maturationTime: month + generatedTimeAndReturn.timeToMaturity,
+          returnAmount: investmentOpportunities[0].investmentAmount * generatedTimeAndReturn.returnMultiplier
+        });
+      }
+      investmentOpportunities.shift();
+    }
+  }
+
+  return outcome;
+}
+
+export function generateOutcomes(simulationParams: SimulationParameters): Simulation {
+
+  const simulation: Simulation = [];
+
+  for (let i = 0; i < simulationParams.simulationCount; i++) {
+    simulation.push(generateOutcome(simulationParams));
+  }
+
+  console.log(simulation.map(outcome => outcome.at(-1)).reduce((acc, item) => {
+    acc[item] = (acc[item] || 0) + 1
+    return acc
+  }, {}));
+
+  return simulation;
 }

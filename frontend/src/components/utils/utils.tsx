@@ -37,6 +37,7 @@ function generateOutcome(simulationParams: SimulationParameters): Outcome {
 
   const outcome: Outcome = [];
   let balance: number = moneyParams.portfolioValue;
+  let unrealisedValue: number = moneyParams.portfolioValue;
 
   const investmentOpportunities: InvestmentOpportunity[] = []
   const activeInvestments: Set<Investment> = new Set();
@@ -54,7 +55,7 @@ function generateOutcome(simulationParams: SimulationParameters): Outcome {
   for (let month = 0; activeInvestments.size || investmentOpportunities.length; month++) {
 
     // Add the current balance to the outcome
-    outcome.push(balance);
+    outcome.push({ realised: balance, unrealised: unrealisedValue });
 
     // Receive all matured investments
     for (const investment of activeInvestments) {
@@ -68,15 +69,20 @@ function generateOutcome(simulationParams: SimulationParameters): Outcome {
     while (investmentOpportunities.length && investmentOpportunities[0].startTime <= month) {
       if (investmentOpportunities[0].investmentAmount <= balance) {
         balance -= investmentOpportunities[0].investmentAmount;
+        unrealisedValue -= investmentOpportunities[0].investmentAmount;
         const generatedTimeAndReturn: TimeAndReturn = generateTimeAndReturn(distributionParams.die);
+        const maturationTime = month + generatedTimeAndReturn.timeToMaturity;
+        const returnAmount = investmentOpportunities[0].investmentAmount * generatedTimeAndReturn.returnMultiplier;
+        unrealisedValue += returnAmount;
         activeInvestments.add({
-          maturationTime: month + generatedTimeAndReturn.timeToMaturity,
-          returnAmount: investmentOpportunities[0].investmentAmount * generatedTimeAndReturn.returnMultiplier
+          maturationTime: maturationTime,
+          returnAmount: returnAmount
         });
       }
       investmentOpportunities.shift();
     }
   }
+  outcome.push({ realised: balance, unrealised: unrealisedValue });
 
   return outcome;
 }

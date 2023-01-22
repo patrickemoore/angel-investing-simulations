@@ -20,7 +20,6 @@ type MoneyParameters = {
 
 type TimeParameters = {
   investmentsPerYear: number,
-  investmentPeriod: number
 }
 
 type DistributionParameters = {
@@ -40,6 +39,11 @@ type SimulationParameters = {
   decisionParams: DecisionsParameters;
 }
 
-type Outcome = number[];
+type PortfolioState = {
+  realised: number,
+  unrealised: number
+};
+
+type Outcome = PortfolioState[];
 
 type Simulation = Outcome[];
